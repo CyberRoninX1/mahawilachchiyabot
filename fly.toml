@@ -1,6 +1,3 @@
-cd ~/mwe-whatsapp-bot
-
-cat > fly.toml << 'EOF'
 app = "mahawilachchiyabot"
 primary_region = "sin"
 
@@ -19,4 +16,3 @@ primary_region = "sin"
 [mounts]
   source = "auth_data"
   destination = "/app/auth_info"
-EOF
