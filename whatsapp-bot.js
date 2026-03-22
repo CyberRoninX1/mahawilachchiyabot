@@ -10,8 +10,8 @@ let sock = null;
 let isConnected = false;
 let currentQR = null;
 
-// Admin WhatsApp number
-const ADMIN_NUMBER = '94789748241'; // CHANGE THIS TO YOUR NUMBER
+// Admin WhatsApp number (Change to your number)
+const ADMIN_NUMBER = '94789748241';
 
 async function connectToWhatsApp() {
     console.log('📱 Starting WhatsApp connection...');
@@ -29,7 +29,7 @@ async function connectToWhatsApp() {
         
         if (qr) {
             currentQR = qr;
-            console.log('\n🔐 QR CODE GENERATED!\n');
+            console.log('\n🔐 QR CODE GENERATED! Scan with WhatsApp:\n');
             qrcode.generate(qr, { small: true });
             console.log('\n📱 Open WhatsApp > Settings > Linked Devices > Link a Device\n');
         }
@@ -56,7 +56,7 @@ async function connectToWhatsApp() {
         }
     });
     
-    // ============ HANDLE INCOMING MESSAGES ============
+    // Handle incoming messages
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -82,9 +82,7 @@ async function connectToWhatsApp() {
             return;
         }
         
-        // ============ ADMIN COMMANDS ============
-        
-        // .help
+        // Admin commands
         if (messageText === '.help') {
             const helpMessage = `🤖 *Admin Bot Commands*\n\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -93,23 +91,18 @@ async function connectToWhatsApp() {
                 `🔹 *.status* - Check bot status\n` +
                 `🔹 *.help* - Show this menu\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-                `📌 *Example:*\n` +
-                `.verify 8\n\n` +
+                `📌 *Example:* .verify 8\n\n` +
                 `🏪 *Mahawilacchiya E-Shop*`;
             
             await sock.sendMessage(sender, { text: helpMessage });
-            console.log(`✅ Sent help to admin`);
         }
-        
-        // .pending
         else if (messageText === '.pending') {
             try {
                 const response = await fetch('https://mahawilachchiyaeshop.gt.tc/api/pending-payments.php');
                 const data = await response.json();
                 
                 if (data.success && data.payments && data.payments.length > 0) {
-                    let pendingMessage = `📋 *Pending Payments*\n\n`;
-                    pendingMessage += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    let pendingMessage = `📋 *Pending Payments*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
                     for (let payment of data.payments) {
                         pendingMessage += `🆔 ID: ${payment.id}\n`;
                         pendingMessage += `🏪 Shop: ${payment.shop_name}\n`;
@@ -126,12 +119,9 @@ async function connectToWhatsApp() {
                     await sock.sendMessage(sender, { text: '✅ No pending payments.' });
                 }
             } catch (error) {
-                console.error('Error:', error);
-                await sock.sendMessage(sender, { text: '❌ Error fetching pending payments. Check server connection.' });
+                await sock.sendMessage(sender, { text: '❌ Error fetching pending payments.' });
             }
         }
-        
-        // .verify [ID]
         else if (messageText.startsWith('.verify')) {
             const parts = messageText.split(' ');
             const paymentId = parts[1];
@@ -162,12 +152,9 @@ async function connectToWhatsApp() {
                     await sock.sendMessage(sender, { text: `❌ ${result.message}` });
                 }
             } catch (error) {
-                console.error('Error:', error);
-                await sock.sendMessage(sender, { text: '❌ Error verifying payment. Check server connection.' });
+                await sock.sendMessage(sender, { text: '❌ Error verifying payment.' });
             }
         }
-        
-        // .status
         else if (messageText === '.status') {
             const statusMessage = `📊 *Bot Status*\n\n` +
                 `✅ Connection: ${isConnected ? 'Connected' : 'Disconnected'}\n` +
@@ -177,8 +164,6 @@ async function connectToWhatsApp() {
             
             await sock.sendMessage(sender, { text: statusMessage });
         }
-        
-        // Unknown command
         else if (messageText.startsWith('.')) {
             await sock.sendMessage(sender, { text: '❌ Unknown command. Send .help for available commands.' });
         }
@@ -187,8 +172,7 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// ============ API ENDPOINTS ============
-
+// API Endpoints
 app.post('/send-whatsapp', async (req, res) => {
     const { phone, message } = req.body;
     
