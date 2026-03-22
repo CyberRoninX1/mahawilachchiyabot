@@ -4,8 +4,7 @@
   "description": "WhatsApp Bot for Mahawilacchiya E-Shop",
   "main": "whatsapp-bot.js",
   "scripts": {
-    "start": "node whatsapp-bot.js",
-    "dev": "nodemon whatsapp-bot.js"
+    "start": "node whatsapp-bot.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.5.0",
@@ -15,7 +14,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "author": "Mahawilacchiya E-Shop",
-  "license": "MIT"
+  }
 }
