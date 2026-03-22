@@ -1,9 +1,7 @@
-app = "mwe-whatsapp-bot"
+app = "mahawilachchiyabot"
 primary_region = "sin"
 
 [build]
-  [build.args]
-    NODE_VERSION = "18"
 
 [http_service]
   internal_port = 3000
@@ -12,21 +10,9 @@ primary_region = "sin"
   auto_start_machines = true
   min_machines_running = 1
 
-[[services]]
-  protocol = "tcp"
-  internal_port = 3000
-
-  [[services.ports]]
-    port = 80
-    handlers = ["http"]
-
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
+[env]
+  PORT = "3000"
 
 [mounts]
   source = "auth_data"
   destination = "/app/auth_info"
-
-[env]
-  NODE_ENV = "production"
