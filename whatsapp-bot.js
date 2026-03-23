@@ -1,8 +1,8 @@
-const crypto = require('crypto');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const express = require('express');
-const bodyParser = require('body-parser');
-const qrcode = require('qrcode-terminal');
+import crypto from 'crypto';
+import { default as makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
+import express from 'express';
+import bodyParser from 'body-parser';
+import qrcode from 'qrcode-terminal';
 
 const app = express();
 app.use(bodyParser.json());
