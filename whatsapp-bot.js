@@ -4,6 +4,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const qrcode = require('qrcode-terminal');
 
+// Rest of your code...
+
 const app = express();
 app.use(bodyParser.json());
 
