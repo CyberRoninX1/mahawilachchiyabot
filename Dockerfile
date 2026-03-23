@@ -1,7 +1,4 @@
-FROM node:18-slim
-
-# Install git
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+FROM node:16
 
 WORKDIR /app
 
