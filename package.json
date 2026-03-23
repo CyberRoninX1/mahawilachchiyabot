@@ -2,7 +2,6 @@
   "name": "mwe-whatsapp-bot",
   "version": "1.0.0",
   "type": "module",
-  "description": "WhatsApp Bot for Mahawilacchiya E-Shop",
   "main": "whatsapp-bot.js",
   "scripts": {
     "start": "node whatsapp-bot.js"
