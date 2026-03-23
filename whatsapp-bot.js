@@ -10,9 +10,13 @@ app.use(bodyParser.json());
 let sock = null;
 let isConnected = false;
 let currentQR = null;
+let pairingCode = null;
 
-// Admin WhatsApp number (Change to your number)
+// Admin WhatsApp number
 const ADMIN_NUMBER = '94789748241';
+
+// Store pairing requests
+let pendingPairing = {};
 
 async function connectToWhatsApp() {
     console.log('📱 Starting WhatsApp connection...');
@@ -21,18 +25,22 @@ async function connectToWhatsApp() {
     
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
-        browser: ['Mahawilacchiya E-Shop', 'Chrome', '1.0.0']
+        printQRInTerminal: false,  // Disable QR to avoid errors
+        browser: ['Mahawilacchiya E-Shop', 'Chrome', '1.0.0'],
+        // Add timeout settings
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 10000,
+        connectTimeoutMs: 60000
     });
     
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
             currentQR = qr;
-            console.log('\n🔐 QR CODE GENERATED! Scan with WhatsApp:\n');
-            qrcode.generate(qr, { small: true });
-            console.log('\n📱 Open WhatsApp > Settings > Linked Devices > Link a Device\n');
+            console.log('\n🔐 QR CODE GENERATED!');
+            console.log('📱 Open WhatsApp > Settings > Linked Devices > Link a Device');
+            console.log('📱 Or use pairing code via /pair endpoint\n');
         }
         
         if (connection === 'close') {
@@ -47,15 +55,13 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             isConnected = true;
             currentQR = null;
-            console.log('\n✅ WHATSAPP CONNECTED!\n');
-            console.log('📱 Admin WhatsApp: ' + ADMIN_NUMBER);
-            console.log('💡 Commands:');
-            console.log('   .help - Show commands');
-            console.log('   .pending - Show pending payments');
-            console.log('   .verify [ID] - Verify a payment');
-            console.log('   .status - Check bot status\n');
+            console.log('\n✅✅✅ WHATSAPP CONNECTED! ✅✅✅\n');
+            console.log('🎉 Bot is ready!\n');
         }
     });
+    
+    // Handle pairing code
+    sock.ev.on('creds.update', saveCreds);
     
     // Handle incoming messages
     sock.ev.on('messages.upsert', async (m) => {
@@ -73,104 +79,29 @@ async function connectToWhatsApp() {
         const senderName = msg.pushName || 'User';
         const senderNumber = sender.split('@')[0];
         
-        console.log(`📩 Received: "${messageText}" from ${senderName} (${senderNumber})`);
-        
-        // Only process commands from admin
-        const isAdmin = senderNumber === ADMIN_NUMBER || sender === ADMIN_NUMBER + '@s.whatsapp.net';
-        
-        if (!isAdmin && messageText.startsWith('.')) {
-            await sock.sendMessage(sender, { text: '❌ You are not authorized to use admin commands.' });
-            return;
-        }
+        console.log(`📩 Received: "${messageText}" from ${senderName}`);
         
         // Admin commands
-        if (messageText === '.help') {
-            const helpMessage = `🤖 *Admin Bot Commands*\n\n` +
-                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `🔹 *.pending* - Show pending payments\n` +
-                `🔹 *.verify [ID]* - Verify a payment\n` +
-                `🔹 *.status* - Check bot status\n` +
-                `🔹 *.help* - Show this menu\n` +
-                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-                `📌 *Example:* .verify 8\n\n` +
-                `🏪 *Mahawilacchiya E-Shop*`;
-            
-            await sock.sendMessage(sender, { text: helpMessage });
-        }
-        else if (messageText === '.pending') {
-            try {
-                const response = await fetch('https://mahawilachchiyaeshop.gt.tc/api/pending-payments.php');
-                const data = await response.json();
-                
-                if (data.success && data.payments && data.payments.length > 0) {
-                    let pendingMessage = `📋 *Pending Payments*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-                    for (let payment of data.payments) {
-                        pendingMessage += `🆔 ID: ${payment.id}\n`;
-                        pendingMessage += `🏪 Shop: ${payment.shop_name}\n`;
-                        pendingMessage += `💰 Amount: Rs. ${payment.amount}\n`;
-                        pendingMessage += `📅 Date: ${payment.date}\n`;
-                        pendingMessage += `🔖 Ref: ${payment.transaction_ref}\n`;
-                        pendingMessage += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-                    }
-                    pendingMessage += `\n✅ To verify: .verify [ID]\n`;
-                    pendingMessage += `Example: .verify ${data.payments[0].id}`;
-                    
-                    await sock.sendMessage(sender, { text: pendingMessage });
-                } else {
-                    await sock.sendMessage(sender, { text: '✅ No pending payments.' });
-                }
-            } catch (error) {
-                await sock.sendMessage(sender, { text: '❌ Error fetching pending payments.' });
-            }
-        }
-        else if (messageText.startsWith('.verify')) {
-            const parts = messageText.split(' ');
-            const paymentId = parts[1];
-            
-            if (!paymentId) {
-                await sock.sendMessage(sender, { text: '❌ Please provide payment ID. Example: .verify 8' });
-                return;
-            }
-            
-            try {
-                const response = await fetch('https://mahawilachchiyaeshop.gt.tc/api/verify-payment.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ payment_id: paymentId })
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    const successMessage = `✅ *Payment Verified!*\n\n` +
-                        `Payment ID: ${paymentId}\n` +
-                        `Shop: ${result.shop_name}\n` +
-                        `Amount: Rs. ${result.amount}\n\n` +
-                        `The seller's account has been updated.`;
-                    
-                    await sock.sendMessage(sender, { text: successMessage });
-                    console.log(`✅ Verified payment ${paymentId}`);
-                } else {
-                    await sock.sendMessage(sender, { text: `❌ ${result.message}` });
-                }
-            } catch (error) {
-                await sock.sendMessage(sender, { text: '❌ Error verifying payment.' });
-            }
-        }
-        else if (messageText === '.status') {
-            const statusMessage = `📊 *Bot Status*\n\n` +
-                `✅ Connection: ${isConnected ? 'Connected' : 'Disconnected'}\n` +
-                `👤 Admin: ${ADMIN_NUMBER}\n` +
-                `🕐 Time: ${new Date().toLocaleString()}\n` +
-                `📱 WhatsApp Bot Running`;
-            
-            await sock.sendMessage(sender, { text: statusMessage });
-        }
-        else if (messageText.startsWith('.')) {
-            await sock.sendMessage(sender, { text: '❌ Unknown command. Send .help for available commands.' });
+        if (messageText === '.status') {
+            await sock.sendMessage(sender, { 
+                text: `✅ Bot is connected!\nAdmin: ${ADMIN_NUMBER}\nTime: ${new Date().toLocaleString()}` 
+            });
         }
     });
+}
+
+// Generate pairing code
+async function generatePairingCode(phoneNumber) {
+    if (!sock || !isConnected) {
+        throw new Error('Bot not connected');
+    }
     
-    sock.ev.on('creds.update', saveCreds);
+    let cleanPhone = phoneNumber.toString().trim().replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) cleanPhone = '94' + cleanPhone.substring(1);
+    if (!cleanPhone.startsWith('94')) cleanPhone = '94' + cleanPhone;
+    
+    const code = await sock.requestPairingCode(cleanPhone);
+    return { code, phone: cleanPhone };
 }
 
 // API Endpoints
@@ -197,10 +128,41 @@ app.post('/send-whatsapp', async (req, res) => {
     }
 });
 
-app.get('/health', (req, res) => {
-    res.json({ status: isConnected ? 'connected' : 'disconnected' });
+// Generate pairing code endpoint
+app.post('/pair', async (req, res) => {
+    const { phone } = req.body;
+    
+    if (!phone) {
+        return res.status(400).json({ success: false, message: 'Phone number required' });
+    }
+    
+    if (!isConnected) {
+        return res.status(503).json({ success: false, message: 'Bot not connected yet. Please wait...' });
+    }
+    
+    try {
+        const result = await generatePairingCode(phone);
+        res.json({ 
+            success: true, 
+            pairing_code: result.code,
+            phone: result.phone,
+            instructions: 'Open WhatsApp > Settings > Linked Devices > Link a Device, then enter this code'
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: isConnected ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// QR endpoint
 app.get('/qr', (req, res) => {
     if (currentQR) {
         res.json({ 
@@ -218,7 +180,16 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Bot running on http://0.0.0.0:${PORT}`);
     console.log(`📨 POST http://0.0.0.0:${PORT}/send-whatsapp`);
-    console.log(`🔐 QR: http://0.0.0.0:${PORT}/qr`);
-    console.log(`👤 Admin: ${ADMIN_NUMBER}\n`);
+    console.log(`🔑 POST http://0.0.0.0:${PORT}/pair - To get pairing code`);
+    console.log(`🏥 Health: GET http://0.0.0.0:${PORT}/health\n`);
     connectToWhatsApp();
+});
+
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('\n🛑 Shutting down...');
+    if (sock) {
+        await sock.logout();
+    }
+    process.exit(0);
 });
