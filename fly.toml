@@ -12,7 +12,3 @@ primary_region = "sin"
 
 [env]
   PORT = "3000"
-
-[mounts]
-  source = "auth_data"
-  destination = "/app/auth_info"
