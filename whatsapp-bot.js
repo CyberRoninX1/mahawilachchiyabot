@@ -10,13 +10,9 @@ app.use(bodyParser.json());
 let sock = null;
 let isConnected = false;
 let currentQR = null;
-let pairingCode = null;
 
 // Admin WhatsApp number
 const ADMIN_NUMBER = '94789748241';
-
-// Store pairing requests
-let pendingPairing = {};
 
 async function connectToWhatsApp() {
     console.log('📱 Starting WhatsApp connection...');
@@ -25,9 +21,8 @@ async function connectToWhatsApp() {
     
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false,  // Disable QR to avoid errors
+        printQRInTerminal: false,
         browser: ['Mahawilacchiya E-Shop', 'Chrome', '1.0.0'],
-        // Add timeout settings
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 10000,
         connectTimeoutMs: 60000
@@ -39,8 +34,7 @@ async function connectToWhatsApp() {
         if (qr) {
             currentQR = qr;
             console.log('\n🔐 QR CODE GENERATED!');
-            console.log('📱 Open WhatsApp > Settings > Linked Devices > Link a Device');
-            console.log('📱 Or use pairing code via /pair endpoint\n');
+            console.log('📱 Open WhatsApp > Settings > Linked Devices > Link a Device\n');
         }
         
         if (connection === 'close') {
@@ -56,11 +50,9 @@ async function connectToWhatsApp() {
             isConnected = true;
             currentQR = null;
             console.log('\n✅✅✅ WHATSAPP CONNECTED! ✅✅✅\n');
-            console.log('🎉 Bot is ready!\n');
         }
     });
     
-    // Handle pairing code
     sock.ev.on('creds.update', saveCreds);
     
     // Handle incoming messages
@@ -77,11 +69,9 @@ async function connectToWhatsApp() {
         
         const sender = msg.key.remoteJid;
         const senderName = msg.pushName || 'User';
-        const senderNumber = sender.split('@')[0];
         
         console.log(`📩 Received: "${messageText}" from ${senderName}`);
         
-        // Admin commands
         if (messageText === '.status') {
             await sock.sendMessage(sender, { 
                 text: `✅ Bot is connected!\nAdmin: ${ADMIN_NUMBER}\nTime: ${new Date().toLocaleString()}` 
@@ -90,21 +80,46 @@ async function connectToWhatsApp() {
     });
 }
 
-// Generate pairing code
-async function generatePairingCode(phoneNumber) {
-    if (!sock || !isConnected) {
-        throw new Error('Bot not connected');
-    }
-    
-    let cleanPhone = phoneNumber.toString().trim().replace(/[^0-9]/g, '');
-    if (cleanPhone.startsWith('0')) cleanPhone = '94' + cleanPhone.substring(1);
-    if (!cleanPhone.startsWith('94')) cleanPhone = '94' + cleanPhone;
-    
-    const code = await sock.requestPairingCode(cleanPhone);
-    return { code, phone: cleanPhone };
-}
+// ============ API ENDPOINTS ============
 
-// API Endpoints
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        name: 'Mahawilacchiya E-Shop WhatsApp Bot',
+        status: isConnected ? 'online' : 'offline',
+        version: '1.0.0',
+        endpoints: {
+            health: 'GET /health',
+            qr: 'GET /qr',
+            send_otp: 'POST /send-whatsapp',
+            pair: 'POST /pair'
+        }
+    });
+});
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: isConnected ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// QR code endpoint
+app.get('/qr', (req, res) => {
+    if (currentQR) {
+        res.json({ 
+            status: 'qr_ready',
+            qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentQR)}`
+        });
+    } else if (isConnected) {
+        res.json({ status: 'connected' });
+    } else {
+        res.json({ status: 'waiting' });
+    }
+});
+
+// Send OTP endpoint
 app.post('/send-whatsapp', async (req, res) => {
     const { phone, message } = req.body;
     
@@ -141,11 +156,16 @@ app.post('/pair', async (req, res) => {
     }
     
     try {
-        const result = await generatePairingCode(phone);
+        let cleanPhone = phone.toString().trim().replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) cleanPhone = '94' + cleanPhone.substring(1);
+        if (!cleanPhone.startsWith('94')) cleanPhone = '94' + cleanPhone;
+        
+        const code = await sock.requestPairingCode(cleanPhone);
+        
         res.json({ 
             success: true, 
-            pairing_code: result.code,
-            phone: result.phone,
+            pairing_code: code,
+            phone: cleanPhone,
             instructions: 'Open WhatsApp > Settings > Linked Devices > Link a Device, then enter this code'
         });
     } catch (error) {
@@ -154,34 +174,14 @@ app.post('/pair', async (req, res) => {
     }
 });
 
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: isConnected ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// QR endpoint
-app.get('/qr', (req, res) => {
-    if (currentQR) {
-        res.json({ 
-            status: 'qr_ready',
-            qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentQR)}`
-        });
-    } else if (isConnected) {
-        res.json({ status: 'connected' });
-    } else {
-        res.json({ status: 'waiting' });
-    }
-});
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Bot running on http://0.0.0.0:${PORT}`);
     console.log(`📨 POST http://0.0.0.0:${PORT}/send-whatsapp`);
-    console.log(`🔑 POST http://0.0.0.0:${PORT}/pair - To get pairing code`);
-    console.log(`🏥 Health: GET http://0.0.0.0:${PORT}/health\n`);
+    console.log(`🔑 POST http://0.0.0.0:${PORT}/pair`);
+    console.log(`🏥 GET http://0.0.0.0:${PORT}/health`);
+    console.log(`🔐 GET http://0.0.0.0:${PORT}/qr`);
+    console.log(`🏠 GET http://0.0.0.0:${PORT}/\n`);
     connectToWhatsApp();
 });
 
