@@ -1,0 +1,30 @@
+# koyeb.yaml
+name: whatsapp-bot
+regions:
+  - fra
+  - iad
+services:
+  - name: bot
+    git:
+      repository: YOUR_GITHUB_USERNAME/whatsapp-bot
+      branch: main
+    docker:
+      image: node:18-alpine
+    build:
+      command: npm install
+    run:
+      command: node bot.js
+    ports:
+      - port: 3000
+        protocol: http
+    routes:
+      - path: /
+    env:
+      - key: NODE_ENV
+        value: production
+    health_check:
+      path: /health
+      port: 3000
+      interval: 30s
+      timeout: 5s
+      initial_delay: 10s
