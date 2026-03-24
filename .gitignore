@@ -2,4 +2,3 @@ node_modules/
 auth_info/
 *.log
 .DS_Store
-.env
