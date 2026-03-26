@@ -1,8 +1,0 @@
-# .koyebignore
-node_modules/
-.git/
-*.log
-.DS_Store
-README.md
-.gitignore
-auth_info/
